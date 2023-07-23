@@ -1,3 +1,3 @@
-module github.com/goccha/time
+module github.com/goccha/times
 
 go 1.14
