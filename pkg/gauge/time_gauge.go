@@ -17,6 +17,7 @@ func New(begin, end time.Time) *TimeGauge {
 	return tg
 }
 
+// TimeGauge 時間計測機
 type TimeGauge struct {
 	date     string
 	begin    time.Time
@@ -24,15 +25,25 @@ type TimeGauge struct {
 	duration *time.Duration
 }
 
+// Date 日付を返す
 func (t *TimeGauge) Date() string {
+	if t.date == "" {
+		t.date = t.begin.Format("2006-01-02")
+	}
 	return t.date
 }
+
+// Begin 開始日時を返す
 func (t *TimeGauge) Begin() time.Time {
 	return t.begin
 }
+
+// End 終了日時を返す
 func (t *TimeGauge) End() time.Time {
 	return t.end
 }
+
+// Duration 期間を返す
 func (t *TimeGauge) Duration() time.Duration {
 	if t.duration == nil {
 		d := t.end.Sub(t.begin)
@@ -46,17 +57,37 @@ func (t *TimeGauge) Seconds() float64 {
 	return t.Duration().Seconds()
 }
 
-// Minutes
+// Minutes returns the duration as a floating point number of minutes.
 func (t *TimeGauge) Minutes() float64 {
 	return t.Duration().Minutes()
 }
 
-// Hours
+// Hours returns the duration as a floating point number of hours.
 func (t *TimeGauge) Hours() float64 {
 	return t.Duration().Hours()
 }
 
-// Rounds
+// Days returns the duration as a floating point number of days(24h).
+func (t *TimeGauge) Days() float64 {
+	return t.Duration().Hours() / 24
+}
+
+// Weeks returns the duration as a floating point number of weeks(168h).
+func (t *TimeGauge) Weeks() float64 {
+	return t.Duration().Hours() / 168
+}
+
+// Months returns the duration as a floating point number of months(720h).
+func (t *TimeGauge) Months() float64 {
+	return t.Duration().Hours() / 720
+}
+
+// Years returns the duration as a floating point number of years(8760h).
+func (t *TimeGauge) Years() float64 {
+	return t.Duration().Hours() / 8760
+}
+
+// Rounds returns the number of hours, minutes, and seconds.
 func (t *TimeGauge) Rounds() (hour int, minute int, second int) {
 	d := t.Duration().Round(time.Second)
 	h := d / time.Hour
@@ -67,7 +98,7 @@ func (t *TimeGauge) Rounds() (hour int, minute int, second int) {
 	return int(h), int(m), int(s)
 }
 
-// RoundAll
+// RoundAll returns the number of hours, minutes, seconds, milliseconds, and nanoseconds.
 func (t *TimeGauge) RoundAll() (hour int, minute int, second int, milli int, micro int, nano int) {
 	d := t.Duration()
 	h := d / time.Hour
@@ -84,7 +115,7 @@ func (t *TimeGauge) RoundAll() (hour int, minute int, second int, milli int, mic
 	return int(h), int(m), int(s), int(ml), int(mi), int(n)
 }
 
-// Format
+// Format 文字列に変換する
 func (t *TimeGauge) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
@@ -131,12 +162,12 @@ func (t *TimeGauge) Format(s fmt.State, verb rune) {
 }
 
 // Split 期間を基準時刻で分割する
-func (t *TimeGauge) Split(hour, min, sec, nsec int, loc *time.Location) []TimeGauge {
+func (t *TimeGauge) Split(hour, min, sec, ns int, loc *time.Location) []TimeGauge {
 	b := baseTime{
 		hour: hour,
 		min:  min,
 		sec:  sec,
-		nsec: nsec,
+		ns:   ns,
 		loc:  loc,
 	}
 	timeRange := t.end.Sub(t.begin)
@@ -144,7 +175,7 @@ func (t *TimeGauge) Split(hour, min, sec, nsec int, loc *time.Location) []TimeGa
 		return []TimeGauge{}
 	}
 	m := make(map[string]*TimeGauge)
-	calc(b, t.begin, timeRange, m)
+	split(b, t.begin, timeRange, m)
 	times := make([]TimeGauge, 0, len(m))
 	for _, v := range m {
 		times = append(times, *v)
@@ -157,17 +188,17 @@ type baseTime struct {
 	hour int
 	min  int
 	sec  int
-	nsec int
+	ns   int
 	loc  *time.Location
 }
 
 // Time 指定日の基準時刻(time.Time)を返す
 func (t baseTime) Time(tm time.Time) time.Time {
-	return time.Date(tm.Year(), tm.Month(), tm.Day(), t.hour, t.min, t.sec, t.nsec, t.loc)
+	return time.Date(tm.Year(), tm.Month(), tm.Day(), t.hour, t.min, t.sec, t.ns, t.loc)
 }
 
-// calc 開始日時からの経過時間を基準時刻で日付毎に分割する
-func calc(b baseTime, tm time.Time, timeRange time.Duration, times map[string]*TimeGauge) {
+// split 開始日時からの経過時間を基準時刻で日付毎に分割する
+func split(b baseTime, tm time.Time, timeRange time.Duration, times map[string]*TimeGauge) {
 	if timeRange <= 0 {
 		return
 	}
@@ -189,7 +220,7 @@ func calc(b baseTime, tm time.Time, timeRange time.Duration, times map[string]*T
 				end:   base,
 			}
 			timeRange -= diff
-			calc(b, base, timeRange, times)
+			split(b, base, timeRange, times)
 			return
 		}
 	} else {
@@ -218,7 +249,7 @@ func calc(b baseTime, tm time.Time, timeRange time.Duration, times map[string]*T
 				}
 			}
 			timeRange -= diff
-			calc(b, base, timeRange, times)
+			split(b, base, timeRange, times)
 			return
 		}
 	}
@@ -239,4 +270,9 @@ func (t *TimeGauge) Overlap(start time.Time, end time.Time) bool {
 		return true
 	}
 	return false
+}
+
+// Contains 指定した日時が期間内に含まれるかどうか
+func (t *TimeGauge) Contains(tm time.Time) bool {
+	return t.begin.Before(tm) && t.end.After(tm)
 }
